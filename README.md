@@ -10,17 +10,21 @@ cargo install --path .
 ```
  
 ## Usage
+
 ### Code
 Uses `cargo clippy` lints to highlight potential issues in code (e.g. unsafe math, unwraps, function length).
 ```shell
 sbp-review code
 ```
 Note: ctrl-clicking on the mentioned source location within the resulting output should take you directly to the offending code.
-### Manifest
+
+### Manifests
 Basic manifest inspection using `cargo metadata`. Useful for checking for missing manifest attributes and for validating supported versions of Substrate, Cumulus, Polkadot.
 ```shell
 sbp-review manifest
 ```
+Note: ctrl-clicking on the manifest name within the resulting output should take you directly to the `cargo.toml` file.
+
 ### Tests
 Simply runs `cargo test` for a workspace.
 ```shell

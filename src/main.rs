@@ -15,8 +15,8 @@ struct Cli {
 enum Commands {
     /// Analyses code for known issues.
     Code,
-    /// Analyses manifest for known issues.
-    Manifest,
+    /// Analyses manifest(s) for known issues.
+    Manifests,
     /// Executes available tests.
     Tests,
     /// Executes available benchmarks as tests.
@@ -27,7 +27,7 @@ fn main() {
     match &Cli::parse().command {
         None => {}
         Some(Commands::Code) => lint(),
-        Some(Commands::Manifest) => metadata(),
+        Some(Commands::Manifests) => metadata(),
         Some(Commands::Tests) => test(),
         Some(Commands::Benchmarks) => benchmark(),
     }
@@ -65,6 +65,10 @@ fn lint() {
         .args(args)
         .output()
         .unwrap();
+
+    if output.stderr.len() > 0 {
+        println!("{}", String::from_utf8_lossy(&output.stderr))
+    }
 
     let mut matches = Vec::new();
     let output = String::from_utf8_lossy(&output.stdout);
@@ -145,7 +149,7 @@ fn ignored(message: &Message) -> bool {
 }
 
 fn metadata() {
-    println!("Analysing manifest via metadata...");
+    println!("Analysing manifest(s) via metadata...");
 
     let output = Command::new("cargo")
         .arg("metadata")
@@ -157,44 +161,51 @@ fn metadata() {
     match serde_json::from_str::<manifests::Metadata>(&output) {
         Ok(metadata) => {
             for package in metadata.packages {
+                println!(
+                    "{}",
+                    Link::new(&package.name, &format!("file:///{}", package.manifest_path))
+                        .to_string()
+                        .cyan()
+                );
+
                 match package.authors.len() {
-                    0 => println!("{} no 'authors' found", "warning".yellow()),
-                    _ => println!("authors: {}", package.authors.join(", ")),
+                    0 => println!("  {} no 'authors' found", "warning".yellow()),
+                    _ => println!("  authors: {}", package.authors.join(", ")),
                 }
 
                 match package.description {
-                    None => println!("{} no 'description' found", "warning".yellow()),
-                    Some(description) => println!("description: {}", description),
+                    None => println!("  {} no 'description' found", "warning".yellow()),
+                    Some(description) => println!("  description: {}", description),
                 }
 
                 match package.license {
-                    None => println!("{} no 'license' found", "warning".yellow()),
-                    Some(license) => println!("license: {}", license),
+                    None => println!("  {} no 'license' found", "warning".yellow()),
+                    Some(license) => println!("  license: {}", license),
                 }
 
                 // check dependencies
-                for dependency in package.dependencies {
+                const SUBSTRATE_REPO: &str = "git+https://github.com/paritytech/substrate";
+                for (name, source) in package.dependencies.iter().filter_map(|d| {
+                    d.source
+                        .as_ref()
+                        .and_then(|s| s.starts_with(SUBSTRATE_REPO).then(|| (&d.name, s)))
+                }) {
                     // todo: collect substrate, cumulus, polkadot versions and ensure all match
-                    if dependency
-                        .source
-                        .starts_with("git+https://github.com/paritytech/substrate")
+                    let url = url::Url::parse(&source[4..]).unwrap();
+                    for (_, value) in url
+                        .query_pairs()
+                        .filter(|(parameter, _)| parameter == "branch")
                     {
-                        let url = url::Url::parse(&dependency.source[4..]).unwrap();
-                        for (_, value) in url
-                            .query_pairs()
-                            .filter(|(parameter, _)| parameter == "branch")
+                        // temp: use last few versions
+                        if !["polkadot-v0.9.42", "polkadot-v0.9.43", "polkadot-v1.0.0"]
+                            .contains(&value.as_ref())
                         {
-                            // temp: use last few versions
-                            if !["polkadot-v0.9.42", "polkadot-v0.9.43", "polkadot-v1.0.0"]
-                                .contains(&value.as_ref())
-                            {
-                                println!(
-                                    "{} {} for '{}' is out of date",
-                                    "warning".yellow(),
-                                    value,
-                                    dependency.name
-                                )
-                            }
+                            println!(
+                                "  {} {} for '{}' is out of date",
+                                "warning".yellow(),
+                                value,
+                                name
+                            )
                         }
                     }
                 }
@@ -283,6 +294,7 @@ mod manifests {
     #[derive(Serialize, Deserialize)]
     pub(crate) struct Package {
         pub(crate) name: String,
+        pub(crate) manifest_path: String,
         pub(crate) version: String,
         pub(crate) license: Option<String>,
         pub(crate) license_file: Option<String>,
@@ -295,6 +307,6 @@ mod manifests {
     #[derive(Serialize, Deserialize)]
     pub(crate) struct Dependency {
         pub(crate) name: String,
-        pub(crate) source: String,
+        pub(crate) source: Option<String>,
     }
 }
