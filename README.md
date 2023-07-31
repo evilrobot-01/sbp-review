@@ -12,3 +12,6 @@ sbp-review code
 ```shell
 sbp-review manifest
 ```
+```shell
+sbp-review test
+```

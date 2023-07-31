@@ -16,6 +16,8 @@ enum Commands {
     Code,
     /// Analyses manifest for known issues.
     Manifest,
+    /// Executes available tests.
+    Test,
 }
 
 fn main() {
@@ -23,6 +25,7 @@ fn main() {
         None => {}
         Some(Commands::Code) => lint(),
         Some(Commands::Manifest) => metadata(),
+        Some(Commands::Test) => test(),
     }
 }
 
@@ -174,6 +177,17 @@ fn metadata() {
         Err(e) => println!("{} could not deserialise: {}", "error".red(), e),
     }
 }
+
+fn test() {
+    println!("Executing available tests...");
+
+    let _output = Command::new("cargo")
+        .arg("test")
+        .spawn()
+        .unwrap()
+        .wait().unwrap();
+}
+
 
 mod clippy {
     use serde::{Deserialize, Serialize};
