@@ -207,6 +207,7 @@ fn test() {
 
     let _output = Command::new("cargo")
         .arg("test")
+        .arg("--no-fail-fast")
         .spawn()
         .unwrap()
         .wait()
