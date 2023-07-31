@@ -4,6 +4,10 @@ A quick proof-of-concept to assist with SBP reviews.
 ```shell
 cargo install --git https://github.com/evilrobot-01/sbp-review
 ```
+Alternatively clone the repo and then install locally:
+```shell
+cargo install --path .
+```
  
 ## Usage
 ### Code
