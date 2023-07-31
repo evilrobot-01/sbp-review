@@ -1,3 +1,4 @@
+use crate::clippy::Message;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use std::{fs, process::Command};
@@ -43,7 +44,7 @@ fn lint() {
         // warn
         "-Wclippy::too-many-lines",
         // deny
-        "-Dclippy::expect_used",
+        &format!("-D{}", clippy::EXPECT_UNUSED),
         "-Dclippy::unwrap_used",
         "-Dclippy::ok_expect",
         "-Dclippy::integer_division",
@@ -78,45 +79,66 @@ fn lint() {
     }
 
     // Output results
-    for m in matches {
-        if let Some(message) = m.message {
-            print!(
-                "{} {} {}",
-                match message.level.as_str() {
-                    "warning" => message.level.yellow(),
-                    "error" => message.level.red(),
-                    _ => message.level.normal(),
-                },
-                message.code.map_or("".into(), |c| c.code),
-                message.message,
-            );
-            // add help
-            for item in message.children.iter().filter(|m| m.level == "help" && !m.message.starts_with("for further information")) {
-                print!(" {} {}", "help:".bold(), item.message)
-            }
-            match message.spans.get(0) {
-                None => {}
-                Some(span) => {
-                    let text = format!(
-                        "./{}:{}:{}",
-                        span.file_name, span.line_start, span.column_start
-                    );
-                    let url = format!(
-                        "file:///{}/{}:{}:{}",
-                        std::env::current_dir()
-                            .unwrap()
-                            .into_os_string()
-                            .into_string()
-                            .unwrap(),
-                        span.file_name,
-                        span.line_start,
-                        span.column_start
-                    );
-                    println!(" at {}", Link::new(&text, &url).to_string().cyan())
-                }
+    for message in matches
+        .iter()
+        .filter_map(|m| m.message.as_ref())
+        .filter(|m| !ignored(m))
+    {
+        // todo: sort by file path, line number
+        print!(
+            "{} {} {}",
+            match message.level.as_str() {
+                "warning" => message.level.yellow(),
+                "error" => message.level.red(),
+                _ => message.level.normal(),
+            },
+            message.code.as_ref().map_or("".into(), |c| c.code.as_str()),
+            message.message,
+        );
+        // add help
+        for item in message
+            .children
+            .iter()
+            .filter(|m| m.level == "help" && !m.message.starts_with("for further information"))
+        {
+            print!(" {} {}", "help:".bold(), item.message)
+        }
+        match message.spans.get(0) {
+            None => {}
+            Some(span) => {
+                let text = format!(
+                    "./{}:{}:{}",
+                    span.file_name, span.line_start, span.column_start
+                );
+                let url = format!(
+                    "file:///{}/{}:{}:{}",
+                    std::env::current_dir()
+                        .unwrap()
+                        .into_os_string()
+                        .into_string()
+                        .unwrap(),
+                    span.file_name,
+                    span.line_start,
+                    span.column_start
+                );
+                println!(" at {}", Link::new(&text, &url).to_string().cyan())
             }
         }
     }
+}
+
+fn ignored(message: &Message) -> bool {
+    const EXPECT_USED_IGNORED: [&str; 3] = [
+        "#[pallet::error]",
+        "#[pallet::pallet]",
+        "#[pallet::storage]",
+    ];
+    message.code.as_ref().map(|c| c.code.as_str()) == Some(clippy::EXPECT_UNUSED)
+        && message.spans.iter().any(|s| {
+            s.text
+                .iter()
+                .any(|t| EXPECT_USED_IGNORED.iter().any(|i| t.text.contains(i)))
+        })
 }
 
 fn metadata() {
@@ -134,17 +156,17 @@ fn metadata() {
             for package in metadata.packages {
                 match package.authors.len() {
                     0 => println!("{} no 'authors' found", "warning".yellow()),
-                    _ => println!("authors: {}", package.authors.join(", "))
+                    _ => println!("authors: {}", package.authors.join(", ")),
                 }
 
                 match package.description {
                     None => println!("{} no 'description' found", "warning".yellow()),
-                    Some(description) => println!("description: {}", description)
+                    Some(description) => println!("description: {}", description),
                 }
 
                 match package.license {
                     None => println!("{} no 'license' found", "warning".yellow()),
-                    Some(license) => println!("license: {}", license)
+                    Some(license) => println!("license: {}", license),
                 }
 
                 // check dependencies
@@ -159,8 +181,10 @@ fn metadata() {
                             .query_pairs()
                             .filter(|(parameter, _)| parameter == "branch")
                         {
-                            // temp: use last two versions
-                            if !["polkadot-v0.9.42", "polkadot-v0.9.43", "polkadot-v1.0.0"].contains(&value.as_ref()) {
+                            // temp: use last few versions
+                            if !["polkadot-v0.9.42", "polkadot-v0.9.43", "polkadot-v1.0.0"]
+                                .contains(&value.as_ref())
+                            {
                                 println!(
                                     "{} {} for '{}' is out of date",
                                     "warning".yellow(),
@@ -185,12 +209,14 @@ fn test() {
         .arg("test")
         .spawn()
         .unwrap()
-        .wait().unwrap();
+        .wait()
+        .unwrap();
 }
-
 
 mod clippy {
     use serde::{Deserialize, Serialize};
+
+    pub(super) const EXPECT_UNUSED: &str = "clippy::expect_used";
 
     #[derive(Serialize, Deserialize)]
     pub(crate) struct Match {
@@ -212,13 +238,19 @@ mod clippy {
         pub(crate) code: String,
     }
 
-    #[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize)]
     pub(crate) struct Span {
         pub(crate) file_name: String,
         pub(crate) line_start: u16,
         pub(crate) column_start: u16,
         pub(crate) line_end: u16,
         pub(crate) column_end: u16,
+        pub(crate) text: Vec<Text>,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    pub(crate) struct Text {
+        pub(crate) text: String,
     }
 }
 
