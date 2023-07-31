@@ -17,8 +17,14 @@ Basic manifest inspection using `cargo metadata`. Useful for checking for missin
 ```shell
 sbp-review manifest
 ```
-### Test
+### Tests
 Simply runs `cargo test` for a workspace.
 ```shell
-sbp-review test
+sbp-review tests
+```
+
+### Benchmarks
+Simply runs `cargo test` for a workspace with the `runtime-benchmarks` feature enabled.
+```shell
+sbp-review benchmarks
 ```

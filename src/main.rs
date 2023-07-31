@@ -18,7 +18,9 @@ enum Commands {
     /// Analyses manifest for known issues.
     Manifest,
     /// Executes available tests.
-    Test,
+    Tests,
+    /// Executes available benchmarks as tests.
+    Benchmarks,
 }
 
 fn main() {
@@ -26,7 +28,8 @@ fn main() {
         None => {}
         Some(Commands::Code) => lint(),
         Some(Commands::Manifest) => metadata(),
-        Some(Commands::Test) => test(),
+        Some(Commands::Tests) => test(),
+        Some(Commands::Benchmarks) => benchmark(),
     }
 }
 
@@ -207,6 +210,20 @@ fn test() {
 
     let _output = Command::new("cargo")
         .arg("test")
+        .arg("--no-fail-fast")
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
+}
+
+fn benchmark() {
+    println!("Executing available benchmarks...");
+
+    let _output = Command::new("cargo")
+        .arg("test")
+        .arg("--no-default-features")
+        .arg("--features=runtime-benchmarks")
         .arg("--no-fail-fast")
         .spawn()
         .unwrap()
