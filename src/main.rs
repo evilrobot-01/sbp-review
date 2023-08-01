@@ -43,19 +43,8 @@ fn lint() {
         std::fs::write(CLIPPY_CONFIG, CONFIG).unwrap();
     }
 
-    let args = [
-        "-Wclippy::too-many-lines",
-        &format!("-W{}", clippy::EXPECT_UNUSED),
-        "-Wclippy::unwrap_used",
-        "-Wclippy::ok_expect",
-        "-Wclippy::integer_division",
-        "-Wclippy::indexing_slicing",
-        "-Wclippy::arithmetic_side_effects",
-        "-Wclippy::match_on_vec_items",
-        "-Wclippy::manual_strip",
-        "-Wclippy::await_holding_refcell_ref",
-    ];
-
+    // Set all configured lints as warning
+    let args = clippy::LINTS.map(|l| format!("-W{}", l));
     let output = Command::new("cargo")
         .arg("clippy")
         .arg("--message-format=json")
@@ -92,12 +81,10 @@ fn lint() {
     matches.sort_by_key(|m| {
         m.spans
             .get(0)
-            .map(|s| s.file_name.as_str())
-            .unwrap_or_else(|| "")
+            .map(|s| (&s.file_name, s.line_start, s.column_start))
     });
     // Output results
     for message in matches {
-        // todo: sort by file path, line number
         print!(
             "{} {} {}",
             match message.level.as_str() {
@@ -141,17 +128,17 @@ fn lint() {
 }
 
 fn ignored(message: &Message) -> bool {
-    const EXPECT_USED_IGNORED: [&str; 3] = [
+    const IGNORED: [&str; 4] = [
+        "#[pallet::call]",
         "#[pallet::error]",
         "#[pallet::pallet]",
         "#[pallet::storage]",
     ];
-    message.code.as_ref().map(|c| c.code.as_str()) == Some(clippy::EXPECT_UNUSED)
-        && message.spans.iter().any(|s| {
-            s.text
-                .iter()
-                .any(|t| EXPECT_USED_IGNORED.iter().any(|i| t.text.contains(i)))
-        })
+    message.spans.iter().any(|s| {
+        s.text
+            .iter()
+            .any(|t| IGNORED.iter().any(|i| t.text.contains(i)))
+    })
 }
 
 fn metadata() {
@@ -174,6 +161,7 @@ fn metadata() {
                         .cyan()
                 );
 
+                // Check for common metadata: https://rust-lang.github.io/api-guidelines/documentation.html#cargotoml-includes-all-common-metadata-c-metadata
                 match package.authors.len() {
                     0 => println!("  {} no 'authors' found", "warning".yellow()),
                     _ => println!("  authors: {}", package.authors.join(", ")),
@@ -187,6 +175,11 @@ fn metadata() {
                 match package.license {
                     None => println!("  {} no 'license' found", "warning".yellow()),
                     Some(license) => println!("  license: {}", license),
+                }
+
+                match package.repository {
+                    None => println!("  {} no 'repository' found", "warning".yellow()),
+                    Some(repository) => println!("  repository: {}", repository),
                 }
 
                 // check dependencies
@@ -251,7 +244,133 @@ fn benchmark() {
 mod clippy {
     use serde::{Deserialize, Serialize};
 
-    pub(super) const EXPECT_UNUSED: &str = "clippy::expect_used";
+    // Source: https://rust-lang.github.io/rust-clippy/master/
+    pub(super) const LINTS: [&str; 124] = [
+        "clippy::alloc_instead_of_core",
+        "clippy::allow_attributes_without_reason",
+        "clippy::arithmetic_side_effects",
+        "clippy::as_underscore",
+        "clippy::assertions_on_result_states",
+        "clippy::bool_to_int_with_if",
+        "clippy::branches_sharing_code",
+        "clippy::cargo_common_metadata",
+        "clippy::cast_lossless",
+        "clippy::cast_possible_truncation",
+        "clippy::cast_possible_wrap",
+        "clippy::cast_precision_loss",
+        "clippy::cast_sign_loss",
+        "clippy::checked_conversions",
+        "clippy::cloned_instead_of_copied",
+        "clippy::cognitive_complexity",
+        "clippy::dbg_macro",
+        "clippy::default_trait_access",
+        "clippy::derive_partial_eq_without_eq",
+        "clippy::else_if_without_else",
+        "clippy::empty_structs_with_brackets",
+        "clippy::enum_glob_use",
+        "clippy::equatable_if_let",
+        "clippy::exit",
+        "clippy::expect_used",
+        "clippy::explicit_into_iter_loop",
+        "clippy::explicit_iter_loop",
+        "clippy::fallible_impl_from",
+        "clippy::filter_map_next",
+        "clippy::flat_map_option",
+        "clippy::float_arithmetic",
+        "clippy::float_cmp",
+        "clippy::float_cmp_const",
+        "clippy::format_push_string",
+        "clippy::get_unwrap",
+        "clippy::if_not_else",
+        "clippy::if_then_some_else_none",
+        "clippy::indexing_slicing",
+        "clippy::integer_division",
+        "clippy::implicit_clone",
+        "clippy::inconsistent_struct_constructor",
+        "clippy::inefficient_to_string",
+        "clippy::invalid_upcast_comparisons",
+        "clippy::items_after_statements",
+        "clippy::iter_on_empty_collections",
+        "clippy::iter_on_single_items",
+        "clippy::iter_with_drain",
+        "clippy::large_digit_groups",
+        "clippy::large_include_file",
+        "clippy::large_stack_arrays",
+        "clippy::large_types_passed_by_value",
+        "clippy::let_underscore_must_use",
+        "clippy::linkedlist",
+        "clippy::lossy_float_literal",
+        "clippy::manual_clamp",
+        "clippy::manual_ok_or",
+        "clippy::manual_string_new",
+        "clippy::many_single_char_names",
+        "clippy::map_err_ignore",
+        "clippy::map_unwrap_or",
+        "clippy::match_bool",
+        "clippy::match_on_vec_items",
+        "clippy::match_same_arms",
+        "clippy::match_wild_err_arm",
+        "clippy::match_wildcard_for_single_variants",
+        "clippy::maybe_infinite_iter",
+        "clippy::mismatching_type_param_order",
+        "clippy::mixed_read_write_in_expression",
+        "clippy::module_name_repetitions",
+        "clippy::multiple_crate_versions",
+        "clippy::multiple_inherent_impl",
+        "clippy::needless_collect",
+        "clippy::needless_continue",
+        "clippy::needless_for_each",
+        "clippy::needless_pass_by_value",
+        "clippy::no_effect_underscore_binding",
+        "clippy::nonstandard_macro_braces",
+        "clippy::option_if_let_else",
+        "clippy::option_option",
+        "clippy::or_fun_call",
+        "clippy::panic",
+        "clippy::panic_in_result_fn",
+        "clippy::partial_pub_fields",
+        "clippy::print_stderr",
+        "clippy::print_stdout",
+        "clippy::pub_use",
+        "clippy::range_minus_one",
+        "clippy::range_plus_one",
+        "clippy::redundant_clone",
+        "clippy::redundant_closure_for_method_calls",
+        "clippy::redundant_pub_crate",
+        "clippy::ref_binding_to_reference",
+        "clippy::ref_option_ref",
+        "clippy::rest_pat_in_fully_bound_structs",
+        "clippy::same_functions_in_if_condition",
+        "clippy::same_name_method",
+        "clippy::similar_names",
+        "clippy::string_slice",
+        "clippy::string_to_string",
+        "clippy::struct_excessive_bools",
+        "clippy::suspicious_operation_groupings",
+        "clippy::todo",
+        "clippy::too-many-lines",
+        "clippy::trait_duplication_in_bounds",
+        "clippy::trivial_regex",
+        "clippy::trivially_copy_pass_by_ref",
+        "clippy::try_err",
+        "clippy::type_repetition_in_bounds",
+        "clippy::unimplemented",
+        "clippy::uninlined_format_args",
+        "clippy::unnecessary_join",
+        "clippy::unnecessary_self_imports",
+        "clippy::unnecessary_wraps",
+        "clippy::unneeded_field_pattern",
+        "clippy::unnested_or_patterns",
+        "clippy::unreachable",
+        "clippy::unreadable_literal",
+        "clippy::unused_self",
+        "clippy::unwrap_in_result",
+        "clippy::unwrap_used",
+        "clippy::use_debug",
+        "clippy::use_self",
+        "clippy::useless_let_if_seq",
+        "clippy::wildcard_enum_match_arm",
+    ];
 
     #[derive(Serialize, Deserialize)]
     pub(crate) struct Match {
@@ -306,6 +425,9 @@ mod manifests {
         pub(crate) license_file: Option<String>,
         pub(crate) description: Option<String>,
         pub(crate) authors: Vec<String>,
+        pub(crate) repository: Option<String>,
+        pub(crate) categories: Vec<String>,
+        pub(crate) keywords: Vec<String>,
         pub(crate) edition: String,
         pub(crate) dependencies: Vec<Dependency>,
     }
