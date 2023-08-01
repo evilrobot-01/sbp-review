@@ -16,7 +16,7 @@ Uses `cargo clippy` lints to highlight potential issues in code (e.g. unsafe mat
 ```shell
 sbp-review code
 ```
-Note: ctrl-clicking on the mentioned source location within the resulting output should take you directly to the offending code.
+Note: ctrl-clicking on the mentioned source location within the resulting output should take you directly to the offending code. Ctrl-clicking on the lint name will take you to a page describing the lint in detail.
 
 ### Manifests
 Basic manifest inspection using `cargo metadata`. Useful for checking for missing manifest attributes and for validating supported versions of Substrate, Cumulus, Polkadot.

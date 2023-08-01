@@ -92,7 +92,18 @@ fn lint() {
                 "error" => message.level.red(),
                 _ => message.level.normal(),
             },
-            message.code.as_ref().map_or("".into(), |c| c.code.as_str()),
+            message.code.as_ref().map_or("".into(), |c| {
+                match c.code.starts_with("clippy::") {
+                    true => {
+                        let url = format!(
+                            "https://rust-lang.github.io/rust-clippy/master/#/{}",
+                            c.code.replace("clippy::", "")
+                        );
+                        Link::new(&c.code, &url).to_string().cyan()
+                    }
+                    false => c.code.as_str().into(),
+                }
+            }),
             message.message,
         );
         // add help
@@ -128,7 +139,8 @@ fn lint() {
 }
 
 fn ignored(message: &Message) -> bool {
-    const IGNORED: [&str; 4] = [
+    const IGNORED: [&str; 5] = [
+        "construct_runtime!",
         "#[pallet::call]",
         "#[pallet::error]",
         "#[pallet::pallet]",
