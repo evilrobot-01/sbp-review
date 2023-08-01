@@ -44,18 +44,16 @@ fn lint() {
     }
 
     let args = [
-        // warn
         "-Wclippy::too-many-lines",
-        // deny
-        &format!("-D{}", clippy::EXPECT_UNUSED),
-        "-Dclippy::unwrap_used",
-        "-Dclippy::ok_expect",
-        "-Dclippy::integer_division",
-        "-Dclippy::indexing_slicing",
-        "-Dclippy::integer_arithmetic",
-        "-Dclippy::match_on_vec_items",
-        "-Dclippy::manual_strip",
-        "-Dclippy::await_holding_refcell_ref",
+        &format!("-W{}", clippy::EXPECT_UNUSED),
+        "-Wclippy::unwrap_used",
+        "-Wclippy::ok_expect",
+        "-Wclippy::integer_division",
+        "-Wclippy::indexing_slicing",
+        "-Wclippy::arithmetic_side_effects",
+        "-Wclippy::match_on_vec_items",
+        "-Wclippy::manual_strip",
+        "-Wclippy::await_holding_refcell_ref",
     ];
 
     let output = Command::new("cargo")
@@ -66,9 +64,9 @@ fn lint() {
         .output()
         .unwrap();
 
-    if output.stderr.len() > 0 {
-        println!("{}", String::from_utf8_lossy(&output.stderr))
-    }
+    // if output.stderr.len() > 0 {
+    //     println!("{}", String::from_utf8_lossy(&output.stderr))
+    // }
 
     let mut matches = Vec::new();
     let output = String::from_utf8_lossy(&output.stdout);
@@ -85,12 +83,20 @@ fn lint() {
         fs::remove_file(CLIPPY_CONFIG).unwrap();
     }
 
-    // Output results
-    for message in matches
+    // Filter and sort matches
+    let mut matches: Vec<_> = matches
         .iter()
         .filter_map(|m| m.message.as_ref())
-        .filter(|m| !ignored(m))
-    {
+        .filter(|m| m.code.is_some() && !ignored(m))
+        .collect();
+    matches.sort_by_key(|m| {
+        m.spans
+            .get(0)
+            .map(|s| s.file_name.as_str())
+            .unwrap_or_else(|| "")
+    });
+    // Output results
+    for message in matches {
         // todo: sort by file path, line number
         print!(
             "{} {} {}",
