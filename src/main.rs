@@ -139,10 +139,12 @@ fn lint() {
 }
 
 fn ignored(message: &Message) -> bool {
-    const IGNORED: [&str; 5] = [
+    const IGNORED: [&str; 7] = [
         "construct_runtime!",
+        "#[frame_support::pallet]",
         "#[pallet::call]",
         "#[pallet::error]",
+        "#[pallet::event]",
         "#[pallet::pallet]",
         "#[pallet::storage]",
     ];
